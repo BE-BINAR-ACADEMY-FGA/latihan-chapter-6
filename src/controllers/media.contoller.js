@@ -1,5 +1,7 @@
 const qr = require("node-qr-image");
 const imagekit = require("../lib/imagekit");
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
 
 const storageImage = (req, res) => {
   const imageUrl = `${req.protocol}://${req.get("host")}/image/${
@@ -87,10 +89,51 @@ const imageKitUpload = async (req, res) => {
   }
 };
 
+const multerWithImagekit = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({
+      status: false,
+      message: "File not found",
+      data: null,
+    });
+  }
+
+  const fileBuffer = req.file.buffer.toString("base64");
+
+  const uploadFileToImageKit = await imagekit.upload({
+    fileName: req.file.originalname,
+    file: fileBuffer,
+  });
+
+  const imageUrl = uploadFileToImageKit.url;
+  const { title, description } = req.body;
+
+  const data = await prisma.image.create({
+    data: {
+      title,
+      description,
+      imageUrl,
+    },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      imageUrl: true,
+    },
+  });
+
+  return res.status(200).json({
+    status: true,
+    message: "File uploaded successfully",
+    data,
+  });
+};
+
 module.exports = {
   storageImage,
   storageVideo,
   storageFile,
   generateQRCode,
   imageKitUpload,
+  multerWithImagekit,
 };
